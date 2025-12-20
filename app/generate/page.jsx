@@ -143,81 +143,164 @@ export default function GeneratePage() {
 
     try {
       const html2pdf = (await import('html2pdf.js')).default;
-      const element = document.getElementById('question-paper');
-      if (!element) return;
 
-      // 1. Setup Container & Clone
+      // 1. Construct Raw HTML (Clean Room Approach)
+      // We rebuild the DOM string manually to bypass ALL external CSS/Tailwind dependencies.
+      // This guarantees no "lab()" colors or modern CSS crashes html2canvas.
+
+      const getPageHTML = () => {
+        const borderStyle = 'border: 1px solid black; border-collapse: collapse;';
+        const cellStyle = 'border: 1px solid black; padding: 5px; text-align: left; vertical-align: top; font-size: 12px;';
+        const centerStyle = 'text-align: center;';
+        const boldStyle = 'font-weight: bold;';
+
+        // Helper to render sections
+        const renderSections = () => generatedPaper.map(section => `
+          <div style="margin-bottom: 20px;">
+            <div style="text-align: center; margin-bottom: 5px;">
+              <div style="font-weight: bold; font-size: 14px; border-top: 2px solid black; border-bottom: 2px solid black; display: inline-block; padding: 2px 10px;">
+                ${section.sectionName}
+              </div>
+              <div style="font-size: 10px; font-style: italic; margin-top: 2px;">${section.instructions}</div>
+            </div>
+            
+            <table style="width: 100%; ${borderStyle} font-size: 12px;">
+              <thead>
+                <tr style="background-color: #f0f0f0;">
+                  <th style="${cellStyle} width: 40px; text-align: center;">No</th>
+                  <th style="${cellStyle} text-align: center;">Questions</th>
+                  <th style="${cellStyle} width: 60px; text-align: center;">Marks</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${section.type === 'partA'
+            ? section.questions.map((q, idx) => `
+                    <tr>
+                      <td style="${cellStyle} text-align: center;">${idx + 1}</td>
+                      <td style="${cellStyle}">${q.question_text}</td>
+                      <td style="${cellStyle} text-align: center; font-weight: bold;">${q.marks}</td>
+                    </tr>
+                  `).join('')
+            : section.modules.map((mod, mIdx) => `
+                    <!-- Option 1 -->
+                    <tr>
+                      <td style="${cellStyle} text-align: center; font-weight: bold;">${String.fromCharCode(65 + (mIdx * 2))}</td>
+                      <td style="${cellStyle}">
+                        ${mod.option1.map((sq, sqIdx) => `
+                          <div style="display: flex; margin-bottom: 4px;">
+                            <span style="font-weight: bold; margin-right: 5px;">${String.fromCharCode(97 + sqIdx)})</span>
+                            <span>${sq.question_text}</span>
+                            <span style="margin-left: auto; font-weight: bold; float: right;">${sq.marks}</span>
+                          </div>
+                        `).join('')}
+                      </td>
+                      <td style="${cellStyle} text-align: center; font-weight: bold;">
+                        ${mod.option1.reduce((a, b) => a + (parseInt(b.marks) || 0), 0)}
+                      </td>
+                    </tr>
+                    <!-- OR -->
+                    <tr>
+                      <td colspan="3" style="${cellStyle} text-align: center; font-weight: bold; background-color: #f0f0f0;">OR</td>
+                    </tr>
+                    <!-- Option 2 -->
+                    <tr>
+                      <td style="${cellStyle} text-align: center; font-weight: bold;">${String.fromCharCode(66 + (mIdx * 2))}</td>
+                      <td style="${cellStyle}">
+                        ${mod.option2.map((sq, sqIdx) => `
+                          <div style="display: flex; margin-bottom: 4px;">
+                            <span style="font-weight: bold; margin-right: 5px;">${String.fromCharCode(97 + sqIdx)})</span>
+                            <span>${sq.question_text}</span>
+                            <span style="margin-left: auto; font-weight: bold; float: right;">${sq.marks}</span>
+                          </div>
+                        `).join('')}
+                      </td>
+                      <td style="${cellStyle} text-align: center; font-weight: bold;">
+                         ${mod.option2.reduce((a, b) => a + (parseInt(b.marks) || 0), 0)}
+                      </td>
+                    </tr>
+                  `).join('')
+          }
+              </tbody>
+            </table>
+          </div>
+        `).join('');
+
+        return `
+          <div style="font-family: 'Times New Roman', serif; color: #000000; padding: 20px; background: white;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; margin-bottom: 10px;">
+              <div></div>
+              <div>QP CODE : BT0325MATCRMN</div>
+              <div>Total Pages: 03</div>
+            </div>
+
+            <div style="border: 1px solid #666; margin-bottom: 20px;">
+              <div style="text-align: center; border-bottom: 1px solid #666; padding: 5px;">
+                <div style="font-size: 16px; font-weight: bold;">NEHRU COLLEGE OF ENGINEERING AND RESEARCH CENTRE</div>
+                <div style="font-size: 10px; font-weight: bold;">(AN AUTONOMOUS INSTITUTION)</div>
+              </div>
+              <div style="text-align: center; border-bottom: 1px solid #666; padding: 5px; font-weight: bold; font-size: 14px;">
+                BTech Degree S3 (Regular) Examination October 2025
+              </div>
+              <div style="text-align: center; border-bottom: 1px solid #666; padding: 5px; font-weight: bold; font-size: 14px;">
+                Course Code : 24CSMAT301/24AMMAT301
+              </div>
+              <div style="text-align: center; border-bottom: 1px solid #666; padding: 5px; font-weight: bold; font-size: 14px; text-transform: uppercase;">
+                Course Name : ${selectedSubject || 'MATHEMATICS'}
+              </div>
+              <div style="display: flex; font-size: 14px; font-weight: bold;">
+                <div style="flex: 1; padding: 5px; border-right: 1px solid #666;">Max. Marks: 60</div>
+                <div style="flex: 1; padding: 5px; text-align: right;">Duration: 2½ Hrs</div>
+              </div>
+            </div>
+
+            <!-- Content -->
+            ${renderSections()}
+
+            <!-- Footer -->
+            <div style="text-align: center; margin-top: 30px; font-size: 12px; border-top: 1px solid #ccc; padding-top: 10px;">
+              <div style="font-weight: bold; margin-bottom: 5px;">****</div>
+              <div>Page 1 of 03</div>
+            </div>
+          </div>
+        `;
+      };
+
+      // 2. Create Render Container
       container = document.createElement('div');
-      Object.assign(container.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '794px',
-        zIndex: '-9999',
-        visibility: 'visible' // Ensure visibility for rendering
-      });
+      container.style.position = 'fixed';
+      container.style.top = '0';
+      container.style.left = '0';
+      container.style.width = '794px'; // Exact A4 width
+      container.style.zIndex = '-9999';
+      container.style.background = 'white';
+
+      // Inject Raw HTML
+      container.innerHTML = getPageHTML();
       document.body.appendChild(container);
 
-      const clone = element.cloneNode(true);
-
-      // NUCLEAR FIX: String replace any modern color syntax in the HTML
-      // This forces the html2canvas parser to see safe hex codes only.
-      let cleanHTML = clone.innerHTML;
-      // Regex to find lab(), lch(), oklch() and replace with black (text/border) or white(bg)?
-      // Safest is to just replace them with black for text; most backgrounds are white anyway.
-      cleanHTML = cleanHTML.replace(/lab\([^)]+\)/g, '#000000');
-      cleanHTML = cleanHTML.replace(/lch\([^)]+\)/g, '#000000');
-      cleanHTML = cleanHTML.replace(/oklch\([^)]+\)/g, '#000000');
-      clone.innerHTML = cleanHTML;
-
-      // Safety Styles
-      clone.style.width = '100%';
-      clone.style.margin = '0';
-      clone.style.backgroundColor = '#ffffff';
-      clone.style.color = '#000000';
-
-      // Explicitly force background valid color
-      clone.style.setProperty('background-color', '#ffffff', 'important');
-      clone.style.setProperty('color', '#000000', 'important');
-
-      container.appendChild(clone);
-
-      // Wait for rendering
+      // 3. Render PDF
+      // Wait slightly for any fonts/images
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const opt = {
         margin: [0.3, 0.3, 0.3, 0.3],
-        filename: `${selectedSubject.replace(/\s+/g, '_')}_Institutional_QP.pdf`,
+        filename: `${selectedSubject ? selectedSubject.replace(/\s+/g, '_') : 'Question_Paper'}_Institutional_QP.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
           scale: 2,
           useCORS: true,
-          letterRendering: true,
-          windowWidth: 794
+          windowWidth: 794 // Match container
         },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
       };
 
-      // 2. Attempt High Quality Generation
-      try {
-        await html2pdf().set(opt).from(clone).save();
-      } catch (hqError) {
-        console.warn('High quality PDF generation failed, switching to compatibility mode...', hqError);
-
-        // 3. Fallback: Standard Quality (Low Scale)
-        opt.html2canvas.scale = 1;
-        await html2pdf().set(opt).from(clone).save();
-        alert('Downloaded in Standard Quality (Compatibility Mode)');
-      }
+      await html2pdf().set(opt).from(container).save();
 
     } catch (err) {
-      console.error('Final PDF generation error:', err);
-      // Friendly error mapping
-      let msg = err.message;
-      if (msg.includes('lab') || msg.includes('color')) msg = 'Browser color issue';
-      alert(`PDF Download Failed: ${msg}. Please try a different browser (Chrome/Edge recommended).`);
+      console.error('PDF generation error:', err);
+      alert(`PDF Download Failed: ${err.message}.`);
     } finally {
-      // 4. Cleanup
       if (container && document.body.contains(container)) {
         document.body.removeChild(container);
       }
