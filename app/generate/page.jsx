@@ -143,11 +143,18 @@ export default function GeneratePage() {
       const element = document.getElementById('question-paper');
       if (!element) return;
 
+      window.scrollTo(0, 0); // Ensure page is at top for full capture
+
       const opt = {
-        margin: 0.3,
+        margin: [0.3, 0.3, 0.3, 0.3], // Uniform margins
         filename: `${selectedSubject.replace(/\s+/g, '_')}_Institutional_QP.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: {
+          scale: 3, // Higher scale for clarity
+          useCORS: true,
+          letterRendering: true, // Fix text rendering issues
+          scrollY: 0, // Force capture from top of element
+        },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
       };
 
