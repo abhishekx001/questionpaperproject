@@ -135,6 +135,15 @@ export default function GeneratePage() {
     }
   };
 
+  // Helper to ensure colors are safe for html2canvas
+  const sanitizeColor = (color) => {
+    if (!color) return color;
+    if (color.includes('lab(') || color.includes('lch(') || color.includes('oklch(')) {
+      return '#000000'; // Fallback to black for text
+    }
+    return color;
+  };
+
   const handleDownloadPDF = async () => {
     if (!generatedPaper) return;
 
@@ -143,28 +152,45 @@ export default function GeneratePage() {
       const element = document.getElementById('question-paper');
       if (!element) return;
 
-      // Create a clone for PDF generation to ensure full content capture
+      // Create a clone for PDF generation
       const clone = element.cloneNode(true);
 
-      // Styling to ensure the clone is captured correctly on mobile
-      clone.style.width = '794px'; // A4 width in px (96 PPI)
-      clone.style.maxWidth = 'none'; // Overcome any max-width constraints
+      // FORCE OVERRIDE: Reset all colors to standard RGB to prevent "lab()" errors
+      // Tailwind v4 sometimes computes colors to lab() which html2canvas hates.
+      const allElements = clone.getElementsByTagName('*');
+      for (let i = 0; i < allElements.length; i++) {
+        const el = allElements[i];
+        // Force text to black
+        el.style.color = '#000000';
+        el.style.borderColor = '#000000';
+
+        // Fix backgrounds
+        const bg = window.getComputedStyle(element.getElementsByTagName('*')[i]).backgroundColor;
+        if (bg && (bg.includes('lab') || bg.includes('lch'))) {
+          el.style.backgroundColor = '#ffffff';
+        }
+      }
+
+      // Clone container styling
+      clone.style.width = '794px';
+      clone.style.maxWidth = 'none';
       clone.style.position = 'absolute';
       clone.style.left = '0';
       clone.style.top = '0';
-      clone.style.zIndex = '-9999'; // Hide behind everything
-      clone.style.backgroundColor = 'white'; // Ensure background is white
+      clone.style.zIndex = '-9999';
+      clone.style.backgroundColor = '#ffffff'; // Hex white
+      clone.style.color = '#000000'; // Hex black
       document.body.appendChild(clone);
 
-      // Add a small delay to ensure DOM is fully rendered
-      await new Promise(resolve => setTimeout(resolve, 500)); // Increased timeout for stability
+      // Delay for rendering
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const opt = {
         margin: [0.3, 0.3, 0.3, 0.3],
         filename: `${selectedSubject.replace(/\s+/g, '_')}_Institutional_QP.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
-          scale: 1.5, // Reduced scale to prevent mobile crashes
+          scale: 1.5,
           useCORS: true,
           letterRendering: true,
           scrollY: 0,
@@ -174,11 +200,12 @@ export default function GeneratePage() {
 
       await html2pdf().set(opt).from(clone).save();
 
-      // Cleanup
       document.body.removeChild(clone);
     } catch (err) {
       console.error('PDF generation error:', err);
-      alert(`Failed to generate PDF: ${err.message || 'Unknown error'}`);
+      // Simplify error message for user
+      const msg = err.message.includes('lab') ? 'Browser color compatibility issue. Please try a different browser.' : err.message;
+      alert(`PDF Generation Failed: ${msg}`);
     }
   };
 
