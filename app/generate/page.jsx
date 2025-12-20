@@ -148,24 +148,26 @@ export default function GeneratePage() {
 
       // Styling to ensure the clone is captured correctly on mobile
       clone.style.width = '794px'; // A4 width in px (96 PPI)
+      clone.style.maxWidth = 'none'; // Overcome any max-width constraints
       clone.style.position = 'absolute';
-      clone.style.left = '-9999px';
+      clone.style.left = '0';
       clone.style.top = '0';
+      clone.style.zIndex = '-9999'; // Hide behind everything
+      clone.style.backgroundColor = 'white'; // Ensure background is white
       document.body.appendChild(clone);
 
       // Add a small delay to ensure DOM is fully rendered
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500)); // Increased timeout for stability
 
       const opt = {
         margin: [0.3, 0.3, 0.3, 0.3],
         filename: `${selectedSubject.replace(/\s+/g, '_')}_Institutional_QP.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
-          scale: 2, // Standard scale is usually sufficient with fixed width
+          scale: 1.5, // Reduced scale to prevent mobile crashes
           useCORS: true,
           letterRendering: true,
           scrollY: 0,
-          windowWidth: 800 // Trick html2canvas into thinking desktop view
         },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
       };
@@ -176,7 +178,7 @@ export default function GeneratePage() {
       document.body.removeChild(clone);
     } catch (err) {
       console.error('PDF generation error:', err);
-      alert('Failed to generate PDF. Please try again.');
+      alert(`Failed to generate PDF: ${err.message || 'Unknown error'}`);
     }
   };
 
