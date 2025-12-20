@@ -139,32 +139,34 @@ export default function GeneratePage() {
   const handleDownloadPDF = async () => {
     if (!generatedPaper) return;
 
+    let container = null;
+
     try {
       const html2pdf = (await import('html2pdf.js')).default;
       const element = document.getElementById('question-paper');
       if (!element) return;
 
-      // Create a wrapper to hold the clone "in view" but not messing up UI
-      const container = document.createElement('div');
-      container.style.position = 'fixed';
-      container.style.top = '0';
-      container.style.left = '0';
-      container.style.width = '794px'; // A4 width
-      container.style.zIndex = '-9999'; // Behind everything
+      // 1. Setup Container & Clone
+      container = document.createElement('div');
+      Object.assign(container.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '794px',
+        zIndex: '-9999',
+        visibility: 'visible' // Ensure visibility for rendering
+      });
       document.body.appendChild(container);
 
-      // Clone the element
       const clone = element.cloneNode(true);
 
-      // Basic Style Overrides for PDF Safety
+      // Safety Styles
       clone.style.width = '100%';
       clone.style.margin = '0';
       clone.style.backgroundColor = '#ffffff';
       clone.style.color = '#000000';
 
-      // Fix for "lab()" color crash - Force visible standard colors
-      // We only apply this to the root and let inheritance work. 
-      // If specific components use Tailwind v4 modern colors, we reset them.
+      // Color Safety
       clone.style.setProperty('background-color', '#ffffff', 'important');
       clone.style.setProperty('color', '#000000', 'important');
 
@@ -178,31 +180,36 @@ export default function GeneratePage() {
         filename: `${selectedSubject.replace(/\s+/g, '_')}_Institutional_QP.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
-          scale: 2, // Good quality
+          scale: 2,
           useCORS: true,
           letterRendering: true,
-          windowWidth: 794 // Match container
+          windowWidth: 794
         },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
       };
 
-      await html2pdf().set(opt).from(clone).save();
+      // 2. Attempt High Quality Generation
+      try {
+        await html2pdf().set(opt).from(clone).save();
+      } catch (hqError) {
+        console.warn('High quality PDF generation failed, switching to compatibility mode...', hqError);
 
-      // Cleanup
-      document.body.removeChild(container);
+        // 3. Fallback: Standard Quality (Low Scale)
+        opt.html2canvas.scale = 1;
+        await html2pdf().set(opt).from(clone).save();
+        alert('Downloaded in Standard Quality (Compatibility Mode)');
+      }
+
     } catch (err) {
-      console.error('PDF generation error:', err);
-      // Fallback: If advanced generation fails, try simple generation without cloning (desktop only)
-      if (err.message.includes('lab') || err.message.includes('blank')) {
-        alert('Compatibility Mode: Retrying with standard download...');
-        try {
-          const simpleOpt = { ...opt, html2canvas: { scale: 1 } };
-          await html2pdf().set(simpleOpt).from(element).save();
-        } catch (retryErr) {
-          alert(`PDF Failed: ${retryErr.message}`);
-        }
-      } else {
-        alert(`Failed to generate PDF: ${err.message}`);
+      console.error('Final PDF generation error:', err);
+      // Friendly error mapping
+      let msg = err.message;
+      if (msg.includes('lab') || msg.includes('color')) msg = 'Browser color issue';
+      alert(`PDF Download Failed: ${msg}. Please try a different browser (Chrome/Edge recommended).`);
+    } finally {
+      // 4. Cleanup
+      if (container && document.body.contains(container)) {
+        document.body.removeChild(container);
       }
     }
   };
