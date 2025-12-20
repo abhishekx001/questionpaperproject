@@ -266,36 +266,53 @@ export default function GeneratePage() {
         `;
       };
 
-      // 2. Create Render Container
+      // 2. Create Render Container as a Top-Level Overlay
       container = document.createElement('div');
       container.style.position = 'fixed';
       container.style.top = '0';
       container.style.left = '0';
-      container.style.width = '794px'; // Exact A4 width
-      container.style.zIndex = '-9999';
-      container.style.background = 'white';
+      container.style.width = '100vw'; // Full screen
+      container.style.height = '100vh';
+      container.style.zIndex = '9999'; // Visible on top
+      container.style.backgroundColor = 'rgba(0,0,0,0.85)'; // Dark overlay
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.alignItems = 'center';
+      container.style.justifyContent = 'flex-start';
+      container.style.overflow = 'auto';
+      container.style.padding = '20px';
 
-      // Inject Raw HTML
-      container.innerHTML = getPageHTML();
-      document.body.appendChild(container);
+      const msg = document.createElement('h2');
+      msg.innerText = 'Generating PDF...';
+      msg.style.color = 'white';
+      msg.style.marginBottom = '20px';
+      container.appendChild(msg);
+
+      const paper = document.createElement('div');
+      paper.style.width = '794px';
+      paper.style.minHeight = '1123px';
+      paper.style.backgroundColor = 'white';
+      paper.style.padding = '0';
+      paper.innerHTML = getPageHTML();
+      document.body.appendChild(paper); // Append to body for html2pdf to access
 
       // 3. Render PDF
-      // Wait slightly for any fonts/images
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Longer wait for visibility
 
       const opt = {
-        margin: [0.3, 0.3, 0.3, 0.3],
+        margin: [0, 0, 0, 0],
         filename: `${selectedSubject ? selectedSubject.replace(/\s+/g, '_') : 'Question_Paper'}_Institutional_QP.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
           scale: 2,
           useCORS: true,
-          windowWidth: 794 // Match container
+          windowWidth: 794
         },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+        jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' },
       };
 
-      await html2pdf().set(opt).from(container).save();
+      // Capture the PAPER element, not the overlay container
+      await html2pdf().set(opt).from(paper).save();
 
     } catch (err) {
       console.error('PDF generation error:', err);
