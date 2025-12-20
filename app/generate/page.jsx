@@ -160,13 +160,23 @@ export default function GeneratePage() {
 
       const clone = element.cloneNode(true);
 
+      // NUCLEAR FIX: String replace any modern color syntax in the HTML
+      // This forces the html2canvas parser to see safe hex codes only.
+      let cleanHTML = clone.innerHTML;
+      // Regex to find lab(), lch(), oklch() and replace with black (text/border) or white(bg)?
+      // Safest is to just replace them with black for text; most backgrounds are white anyway.
+      cleanHTML = cleanHTML.replace(/lab\([^)]+\)/g, '#000000');
+      cleanHTML = cleanHTML.replace(/lch\([^)]+\)/g, '#000000');
+      cleanHTML = cleanHTML.replace(/oklch\([^)]+\)/g, '#000000');
+      clone.innerHTML = cleanHTML;
+
       // Safety Styles
       clone.style.width = '100%';
       clone.style.margin = '0';
       clone.style.backgroundColor = '#ffffff';
       clone.style.color = '#000000';
 
-      // Color Safety
+      // Explicitly force background valid color
       clone.style.setProperty('background-color', '#ffffff', 'important');
       clone.style.setProperty('color', '#000000', 'important');
 
