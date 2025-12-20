@@ -153,6 +153,9 @@ export default function GeneratePage() {
       clone.style.top = '0';
       document.body.appendChild(clone);
 
+      // Add a small delay to ensure DOM is fully rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       const opt = {
         margin: [0.3, 0.3, 0.3, 0.3],
         filename: `${selectedSubject.replace(/\s+/g, '_')}_Institutional_QP.pdf`,
