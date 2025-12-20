@@ -136,14 +136,6 @@ export default function GeneratePage() {
   };
 
   // Helper to ensure colors are safe for html2canvas
-  const sanitizeColor = (color) => {
-    if (!color) return color;
-    if (color.includes('lab(') || color.includes('lch(') || color.includes('oklch(')) {
-      return '#000000'; // Fallback to black for text
-    }
-    return color;
-  };
-
   const handleDownloadPDF = async () => {
     if (!generatedPaper) return;
 
@@ -152,37 +144,33 @@ export default function GeneratePage() {
       const element = document.getElementById('question-paper');
       if (!element) return;
 
-      // Create a clone for PDF generation
+      // Create a wrapper to hold the clone "in view" but not messing up UI
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.top = '0';
+      container.style.left = '0';
+      container.style.width = '794px'; // A4 width
+      container.style.zIndex = '-9999'; // Behind everything
+      document.body.appendChild(container);
+
+      // Clone the element
       const clone = element.cloneNode(true);
 
-      // FORCE OVERRIDE: Reset all colors to standard RGB to prevent "lab()" errors
-      // Tailwind v4 sometimes computes colors to lab() which html2canvas hates.
-      const allElements = clone.getElementsByTagName('*');
-      for (let i = 0; i < allElements.length; i++) {
-        const el = allElements[i];
-        // Force text to black
-        el.style.color = '#000000';
-        el.style.borderColor = '#000000';
+      // Basic Style Overrides for PDF Safety
+      clone.style.width = '100%';
+      clone.style.margin = '0';
+      clone.style.backgroundColor = '#ffffff';
+      clone.style.color = '#000000';
 
-        // Fix backgrounds
-        const bg = window.getComputedStyle(element.getElementsByTagName('*')[i]).backgroundColor;
-        if (bg && (bg.includes('lab') || bg.includes('lch'))) {
-          el.style.backgroundColor = '#ffffff';
-        }
-      }
+      // Fix for "lab()" color crash - Force visible standard colors
+      // We only apply this to the root and let inheritance work. 
+      // If specific components use Tailwind v4 modern colors, we reset them.
+      clone.style.setProperty('background-color', '#ffffff', 'important');
+      clone.style.setProperty('color', '#000000', 'important');
 
-      // Clone container styling
-      clone.style.width = '794px';
-      clone.style.maxWidth = 'none';
-      clone.style.position = 'absolute';
-      clone.style.left = '0';
-      clone.style.top = '0';
-      clone.style.zIndex = '-9999';
-      clone.style.backgroundColor = '#ffffff'; // Hex white
-      clone.style.color = '#000000'; // Hex black
-      document.body.appendChild(clone);
+      container.appendChild(clone);
 
-      // Delay for rendering
+      // Wait for rendering
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const opt = {
@@ -190,22 +178,32 @@ export default function GeneratePage() {
         filename: `${selectedSubject.replace(/\s+/g, '_')}_Institutional_QP.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
-          scale: 1.5,
+          scale: 2, // Good quality
           useCORS: true,
           letterRendering: true,
-          scrollY: 0,
+          windowWidth: 794 // Match container
         },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
       };
 
       await html2pdf().set(opt).from(clone).save();
 
-      document.body.removeChild(clone);
+      // Cleanup
+      document.body.removeChild(container);
     } catch (err) {
       console.error('PDF generation error:', err);
-      // Simplify error message for user
-      const msg = err.message.includes('lab') ? 'Browser color compatibility issue. Please try a different browser.' : err.message;
-      alert(`PDF Generation Failed: ${msg}`);
+      // Fallback: If advanced generation fails, try simple generation without cloning (desktop only)
+      if (err.message.includes('lab') || err.message.includes('blank')) {
+        alert('Compatibility Mode: Retrying with standard download...');
+        try {
+          const simpleOpt = { ...opt, html2canvas: { scale: 1 } };
+          await html2pdf().set(simpleOpt).from(element).save();
+        } catch (retryErr) {
+          alert(`PDF Failed: ${retryErr.message}`);
+        }
+      } else {
+        alert(`Failed to generate PDF: ${err.message}`);
+      }
     }
   };
 
