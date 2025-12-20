@@ -143,25 +143,37 @@ export default function GeneratePage() {
       const element = document.getElementById('question-paper');
       if (!element) return;
 
-      window.scrollTo(0, 0); // Ensure page is at top for full capture
+      // Create a clone for PDF generation to ensure full content capture
+      const clone = element.cloneNode(true);
+
+      // Styling to ensure the clone is captured correctly on mobile
+      clone.style.width = '794px'; // A4 width in px (96 PPI)
+      clone.style.position = 'absolute';
+      clone.style.left = '-9999px';
+      clone.style.top = '0';
+      document.body.appendChild(clone);
 
       const opt = {
-        margin: [0.3, 0.3, 0.3, 0.3], // Uniform margins
+        margin: [0.3, 0.3, 0.3, 0.3],
         filename: `${selectedSubject.replace(/\s+/g, '_')}_Institutional_QP.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
-          scale: 3, // Higher scale for clarity
+          scale: 2, // Standard scale is usually sufficient with fixed width
           useCORS: true,
-          letterRendering: true, // Fix text rendering issues
-          scrollY: 0, // Force capture from top of element
+          letterRendering: true,
+          scrollY: 0,
+          windowWidth: 800 // Trick html2canvas into thinking desktop view
         },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
       };
 
-      await html2pdf().set(opt).from(element).save();
+      await html2pdf().set(opt).from(clone).save();
+
+      // Cleanup
+      document.body.removeChild(clone);
     } catch (err) {
       console.error('PDF generation error:', err);
-      alert('Failed to generate PDF.');
+      alert('Failed to generate PDF. Please try again.');
     }
   };
 
