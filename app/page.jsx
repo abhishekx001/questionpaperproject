@@ -1,20 +1,54 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/components/ThemeProvider';
+import Link from 'next/link';
 
-export default function Home() {
-  const [isDark, setIsDark] = useState(false);
+export default function LoginPage() {
+  const router = useRouter();
+  const { isDark, toggleTheme } = useTheme();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Successful login - redirect handled by middleware or manually
+      router.push('/dashboard');
+
+    } catch (err) {
+      setError(err.message || 'Failed to login. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className={`min-h-screen font-sans selection:bg-blue-500 selection:text-white transition-colors duration-500 ${isDark ? 'bg-[#0f172a]' : 'bg-[#f8fafc]'}`}>
+    <div className={`min-h-screen font-sans selection:bg-blue-500 selection:text-white transition-colors duration-500 flex flex-col items-center justify-center relative ${isDark ? 'bg-[#0f172a]' : 'bg-[#f8fafc]'}`}>
 
       {/* Dark Mode Toggle */}
       <button
-        onClick={() => setIsDark(!isDark)}
+        onClick={toggleTheme}
         className={`fixed top-6 right-6 z-50 p-3 rounded-full shadow-xl transition-all duration-300 ${isDark
-            ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700 border border-slate-700'
-            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+          ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700 border border-slate-700'
+          : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
           }`}
         aria-label="Toggle Dark Mode"
       >
@@ -36,108 +70,95 @@ export default function Home() {
         <div className={`absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] rounded-full blur-3xl transition-colors duration-500 ${isDark ? 'bg-purple-900/10' : 'bg-purple-500/5'}`}></div>
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
+      <div className="relative z-10 w-full max-w-md px-4">
         {/* Header / Hero */}
-        <header className="text-center mb-16 lg:mb-24">
+        <header className="text-center mb-10">
           <div className={`inline-block mb-4 px-4 py-1.5 rounded-full text-sm font-bold tracking-wide uppercase shadow-sm transition-colors duration-300 ${isDark
-              ? 'bg-blue-900/30 border border-blue-800 text-blue-400'
-              : 'bg-blue-50 border border-blue-100 text-blue-600'
+            ? 'bg-blue-900/30 border border-blue-800 text-blue-400'
+            : 'bg-blue-50 border border-blue-100 text-blue-600'
             }`}>
             Institutional Edition
           </div>
-          <h1 className={`text-5xl lg:text-7xl font-extrabold mb-6 tracking-tight leading-tight transition-colors duration-300 ${isDark ? 'text-white' : 'text-[#1e293b]'}`}>
-            Question Paper <br className="hidden sm:block" />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 animate-gradient-x">
-              Generator System
-            </span>
+          <h1 className={`text-4xl font-extrabold mb-2 tracking-tight transition-colors duration-300 ${isDark ? 'text-white' : 'text-[#1e293b]'}`}>
+            Welcome Back
           </h1>
-          <p className={`text-xl max-w-2xl mx-auto font-medium leading-relaxed transition-colors duration-300 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-            Create professional, randomized examination papers in seconds.
-            Streamlined for academic excellence and institutional standards.
+          <p className={`text-lg font-medium transition-colors duration-300 ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+            Sign in to access the Generator System.
           </p>
-
-          {/* Primary Actions */}
-          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link
-              href="/dashboard"
-              className={`group px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-3 ${isDark
-                  ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/20'
-                  : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20'
-                }`}
-            >
-              Access Dashboard
-              <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </Link>
-            <Link
-              href="/questions/add"
-              className={`px-8 py-4 border rounded-2xl font-bold text-lg shadow-sm transition-all duration-300 ${isDark
-                  ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white hover:border-slate-600'
-                  : 'bg-white text-[#475569] border-[#e2e8f0] hover:bg-[#f8fafc] hover:border-blue-200 hover:text-blue-600'
-                }`}
-            >
-              Add New Questions
-            </Link>
-          </div>
         </header>
 
-        {/* Feature Cards */}
-        <div className="grid md:grid-cols-3 gap-8 mb-20">
-          {[
-            {
-              icon: '📝',
-              title: 'Smart Repository',
-              desc: 'Organize thousands of questions with metadata like module, marks, and subject.',
-              bgLight: 'bg-blue-50', textLight: 'text-blue-600', borderLight: 'border-blue-100',
-              bgDark: 'bg-blue-900/20', textDark: 'text-blue-400', borderDark: 'border-blue-800/50'
-            },
-            {
-              icon: '⚡',
-              title: 'Instant Generation',
-              desc: 'Generate strictly formatted papers with one click using our intelligent randomization engine.',
-              bgLight: 'bg-indigo-50', textLight: 'text-indigo-600', borderLight: 'border-indigo-100',
-              bgDark: 'bg-indigo-900/20', textDark: 'text-indigo-400', borderDark: 'border-indigo-800/50'
-            },
-            {
-              icon: '🎓',
-              title: 'Institutional PDF',
-              desc: 'Export high-fidelity PDFs that exactly match your university\'s official template.',
-              bgLight: 'bg-purple-50', textLight: 'text-purple-600', borderLight: 'border-purple-100',
-              bgDark: 'bg-purple-900/20', textDark: 'text-purple-400', borderDark: 'border-purple-800/50'
-            }
-          ].map((feature, i) => (
-            <div
-              key={i}
-              className={`p-8 rounded-[2rem] shadow-xl border transition-all duration-300 group ${isDark
-                  ? 'bg-slate-800 border-slate-700 hover:border-blue-500/30 hover:shadow-blue-900/10'
-                  : 'bg-white border-[#e2e8f0] shadow-slate-200/50 hover:border-blue-300/50 hover:shadow-blue-500/10'
+        {/* Login Card */}
+        <div className={`p-8 rounded-[2rem] shadow-xl border transition-all duration-300 ${isDark
+          ? 'bg-slate-800 border-slate-700 shadow-blue-900/10'
+          : 'bg-white border-[#e2e8f0] shadow-slate-200/50'
+          }`}>
+
+          {error && (
+            <div className={`mb-6 p-4 rounded-xl flex items-center text-sm font-bold ${isDark
+              ? 'bg-rose-900/30 text-rose-300 border border-rose-800'
+              : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+              <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="email" className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                Email Address
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className={`w-full px-5 py-4 rounded-2xl outline-none font-medium transition-all duration-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 ${isDark
+                  ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-600'
+                  : 'bg-[#f8fafc] border border-[#e2e8f0] text-[#1e293b] placeholder-[#94a3b8]'}`}
+                placeholder="name@institution.edu"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="password" className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className={`w-full px-5 py-4 rounded-2xl outline-none font-medium transition-all duration-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 ${isDark
+                  ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-600'
+                  : 'bg-[#f8fafc] border border-[#e2e8f0] text-[#1e293b] placeholder-[#94a3b8]'}`}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all duration-200 flex justify-center items-center ${isDark
+                ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed'
                 }`}
             >
-              <div className={`w-14 h-14 border rounded-2xl flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform duration-300 ${isDark
-                  ? `${feature.bgDark} ${feature.textDark} ${feature.borderDark}`
-                  : `${feature.bgLight} ${feature.textLight} ${feature.borderLight}`
-                }`}>
-                {feature.icon}
-              </div>
-              <h3 className={`text-xl font-black mb-3 transition-colors ${isDark ? 'text-white group-hover:text-blue-400' : 'text-[#1e293b] group-hover:text-blue-700'}`}>
-                {feature.title}
-              </h3>
-              <p className={`font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
-                {feature.desc}
-              </p>
-            </div>
-          ))}
+              {loading ? (
+                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
         </div>
 
-        {/* Quick Links Footer */}
-        <div className={`border-t pt-12 flex flex-col md:flex-row justify-between items-center text-sm font-medium transition-colors duration-300 ${isDark ? 'border-slate-800 text-slate-500' : 'border-[#e2e8f0] text-[#94a3b8]'}`}>
-          <p>© 2025 Antigravity EduTech. All rights reserved.</p>
-          <div className="flex gap-6 mt-4 md:mt-0">
-            <Link href="/generate" className="hover:text-blue-600 transition-colors">Quick Generate</Link>
-            <Link href="/template-preview" className="hover:text-blue-600 transition-colors">View Template</Link>
-          </div>
-        </div>
+        <p className={`text-center mt-8 text-sm font-medium ${isDark ? 'text-slate-500' : 'text-[#94a3b8]'}`}>
+          © 2025 EduTech. All rights reserved.
+        </p>
       </div>
     </div>
   );

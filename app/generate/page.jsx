@@ -4,9 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import QuestionPaperTemplate from '@/components/QuestionPaperTemplate';
+import { useTheme } from '@/components/ThemeProvider';
 
 export default function GeneratePage() {
   const router = useRouter();
+  const { isDark } = useTheme();
+
   const [generating, setGenerating] = useState(false);
   const [generatedPaper, setGeneratedPaper] = useState(null);
   const [error, setError] = useState('');
@@ -91,30 +94,97 @@ export default function GeneratePage() {
           .from('questions')
           .select('*')
           .eq('subject', selectedSubject)
-          .eq('unit', modNum);
+          .in('unit', [modNum, `Module ${modNum}`]);
 
         if (modError) throw modError;
 
-        const available = (modQuestions || []).filter(q => !usedIds.includes(q.id));
-        let shuffled = shuffleArray(available);
+        // Filter out questions already used in Part A
+        let available = (modQuestions || []).filter(q => !usedIds.includes(q.id));
 
-        while (shuffled.length < 4) {
-          shuffled.push({
-            id: `placeholder-b-${modNum}-${shuffled.length}`,
-            question_text: `[Sample Module ${modNum} Question] Add more descriptive questions for ${selectedSubject} in Module ${modNum}.`,
-            marks: 5
-          });
+        // -- Strategy: Option 1 Preference vs Option 2 Preference --
+        // Questions explicitly marked 'option1' should go to Option 1.
+        // Questions marked 'option2' should go to Option 2.
+        // Questions marked 'any' (or null) can go anywhere.
+
+        const getQuestionForSlot = (targetMarks, preferredType, currentUsedIds) => {
+          // 1. Find exact match on Marks AND Type
+          const exactMatchIndex = available.findIndex(q =>
+            q.marks === targetMarks &&
+            q.part_b_type === preferredType &&
+            !currentUsedIds.includes(q.id)
+          );
+
+          if (exactMatchIndex !== -1) {
+            return available[exactMatchIndex];
+          }
+
+          // 2. Find match on Marks AND Type='any'
+          const anyMatchIndex = available.findIndex(q =>
+            q.marks === targetMarks &&
+            (q.part_b_type === 'any' || !q.part_b_type) &&
+            !currentUsedIds.includes(q.id)
+          );
+
+          if (anyMatchIndex !== -1) {
+            return available[anyMatchIndex];
+          }
+
+          // 3. Fallback: Relax Mark constraint (swap 4/5) but keep Type preference
+          const relaxedMarkIndex = available.findIndex(q =>
+            (q.part_b_type === preferredType) &&
+            !currentUsedIds.includes(q.id)
+          );
+
+          if (relaxedMarkIndex !== -1) {
+            return available[relaxedMarkIndex];
+          }
+
+          // 4. Last Resort: Any available question not used
+          const lastResortIndex = available.findIndex(q => !currentUsedIds.includes(q.id));
+          if (lastResortIndex !== -1) {
+            return available[lastResortIndex];
+          }
+
+          return null;
+        };
+
+        const selectedForModule = [];
+        const moduleUsedIds = [];
+
+        // We need 4 questions: [Opt1-Q1(5), Opt1-Q2(4), Opt2-Q1(5), Opt2-Q2(4)]
+        const slots = [
+          { marks: 5, pref: 'option1' },
+          { marks: 4, pref: 'option1' },
+          { marks: 5, pref: 'option2' },
+          { marks: 4, pref: 'option2' }
+        ];
+
+        for (const slot of slots) {
+          let q = getQuestionForSlot(slot.marks, slot.pref, moduleUsedIds);
+
+          if (!q) {
+            q = {
+              id: `placeholder-b-${modNum}-${selectedForModule.length}`,
+              question_text: `[Sample Module ${modNum}] Add more ${slot.marks}-mark questions for ${selectedSubject}.`,
+              marks: slot.marks
+            };
+          } else {
+            moduleUsedIds.push(q.id);
+          }
+
+          // Force the mark to match the slot requirement (in case we did a fallback swap)
+          selectedForModule.push({ ...q, marks: slot.marks });
         }
 
         modules.push({
           moduleNumber: modNum,
           option1: [
-            { ...shuffled[0], marks: 5 },
-            { ...shuffled[1], marks: 4 }
+            selectedForModule[0],
+            selectedForModule[1]
           ],
           option2: [
-            { ...shuffled[2], marks: 5 },
-            { ...shuffled[3], marks: 4 }
+            selectedForModule[2],
+            selectedForModule[3]
           ]
         });
       }
@@ -325,33 +395,37 @@ export default function GeneratePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] py-12 px-4 sm:px-6 lg:px-8 font-sans">
+    <div className={`min-h-screen py-12 px-4 sm:px-6 lg:px-8 font-sans transition-colors duration-300 ${isDark ? 'bg-[#0f172a]' : 'bg-[#f8fafc]'}`}>
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
-            <h1 className="text-4xl font-extrabold text-[#1e293b] tracking-tight mb-2">
+            <h1 className={`text-4xl font-extrabold tracking-tight mb-2 transition-colors ${isDark ? 'text-white' : 'text-[#1e293b]'}`}>
               Template <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">Structure</span>
             </h1>
-            <p className="text-lg text-[#64748b] font-medium">
+            <p className={`text-lg font-medium transition-colors ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
               Generating specialized 60-mark institutional papers.
             </p>
           </div>
           <button
             onClick={() => router.push('/dashboard')}
-            className="px-5 py-2.5 rounded-xl text-sm font-bold bg-white text-[#475569] border border-[#e2e8f0] shadow-sm hover:bg-[#f1f5f9] transition-all"
+            className={`px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 ${isDark
+              ? 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700'
+              : 'bg-white text-[#475569] border border-[#e2e8f0] hover:bg-[#f1f5f9]'}`}
           >
             Dashboard
           </button>
         </div>
 
         {/* Action Card */}
-        <div className="bg-white rounded-[2rem] shadow-xl border border-[#e2e8f0] overflow-hidden mb-10">
+        <div className={`rounded-[2rem] shadow-xl border overflow-hidden mb-10 transition-colors ${isDark
+          ? 'bg-slate-800 border-slate-700 shadow-slate-900/20'
+          : 'bg-white border-[#e2e8f0] shadow-slate-200/50'}`}>
           <div className="p-6 md:p-10 text-center">
             <div className="max-w-2xl mx-auto">
-              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl text-3xl flex items-center justify-center mx-auto mb-6">📜</div>
-              <h2 className="text-2xl md:text-3xl font-black text-[#1e293b] mb-4">Select Target Subject</h2>
-              <p className="text-[#64748b] mb-8 text-sm md:text-base">
+              <div className={`w-16 h-16 rounded-2xl text-3xl flex items-center justify-center mx-auto mb-6 ${isDark ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>📜</div>
+              <h2 className={`text-2xl md:text-3xl font-black mb-4 transition-colors ${isDark ? 'text-white' : 'text-[#1e293b]'}`}>Select Target Subject</h2>
+              <p className={`mb-8 text-sm md:text-base transition-colors ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
                 The engine curates 8 Short Answers (PART A) and 4 Module-wise choices (PART B) to match the institutional standard.
               </p>
 
@@ -363,7 +437,9 @@ export default function GeneratePage() {
                     setError('');
                     setWarning('');
                   }}
-                  className="w-full sm:flex-1 max-w-none sm:max-w-sm px-6 py-4 bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none text-[#1e293b] font-bold cursor-pointer transition-all"
+                  className={`w-full sm:flex-1 max-w-none sm:max-w-sm px-6 py-4 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-bold cursor-pointer transition-all duration-200 ${isDark
+                    ? 'bg-slate-900 border-slate-700 text-white'
+                    : 'bg-[#f8fafc] border border-[#e2e8f0] text-[#1e293b]'}`}
                 >
                   <option value="">Choose Subject...</option>
                   {availableSubjects.map((subject) => (
@@ -381,7 +457,10 @@ export default function GeneratePage() {
               </div>
 
               {(error || warning) && (
-                <div className={`mt-6 p-4 rounded-2xl text-sm font-medium border ${error ? 'bg-rose-50 border-rose-100 text-rose-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
+                <div className={`mt-6 p-4 rounded-2xl text-sm font-medium border ${error
+                  ? (isDark ? 'bg-rose-900/20 border-rose-800 text-rose-300' : 'bg-rose-50 border-rose-100 text-rose-700')
+                  : (isDark ? 'bg-amber-900/20 border-amber-800 text-amber-300' : 'bg-amber-50 border-amber-100 text-amber-700')
+                  }`}>
                   {error || warning}
                 </div>
               )}
@@ -393,7 +472,7 @@ export default function GeneratePage() {
         {generatedPaper && (
           <div className="animate-in fade-in slide-in-from-bottom-6 duration-500">
             <div className="flex items-center justify-between mb-6 px-4">
-              <h3 className="text-xl font-extrabold text-[#1e293b]">Institutional Preview</h3>
+              <h3 className={`text-xl font-extrabold transition-colors ${isDark ? 'text-white' : 'text-[#1e293b]'}`}>Institutional Preview</h3>
               <button
                 onClick={handleDownloadPDF}
                 className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 shadow-xl transition-all"
@@ -403,6 +482,7 @@ export default function GeneratePage() {
             </div>
 
             <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-200 p-8 overflow-auto">
+              {/* Note: QuestionPaperTemplate is usually white for print preview, keeping it white */}
               <QuestionPaperTemplate
                 courseName={selectedSubject}
                 sections={generatedPaper}
@@ -414,7 +494,7 @@ export default function GeneratePage() {
 
         {/* Info Box */}
         {!generatedPaper && !generating && (
-          <div className="bg-slate-900 rounded-[2rem] p-10 text-white">
+          <div className={`rounded-[2rem] p-10 text-white transition-colors ${isDark ? 'bg-slate-800' : 'bg-slate-900'}`}>
             <h3 className="text-2xl font-bold mb-8 flex items-center gap-3">
               <span className="w-8 h-px bg-blue-500"></span>
               Format Workflow

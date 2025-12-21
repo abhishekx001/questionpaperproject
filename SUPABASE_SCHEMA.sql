@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS questions (
   subject TEXT NOT NULL,
   unit TEXT,
   difficulty TEXT DEFAULT 'medium',
+  part_b_type TEXT DEFAULT 'any',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -27,6 +28,7 @@ ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
 
 -- Create policy to allow all operations (since we removed authentication)
 -- For public access, allow SELECT, INSERT, UPDATE, DELETE for all
+DROP POLICY IF EXISTS "Allow all operations for questions" ON questions;
 CREATE POLICY "Allow all operations for questions" ON questions
   FOR ALL
   USING (true)
