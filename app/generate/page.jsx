@@ -15,6 +15,8 @@ export default function GeneratePage() {
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
+  const [examinationName, setExaminationName] = useState('BTech Degree S3 (Regular) Examination October 2025');
+  const [courseCode, setCourseCode] = useState('24CSMAT301/24AMMAT301');
   const [availableSubjects, setAvailableSubjects] = useState([]);
 
   const shuffleArray = (array) => {
@@ -139,8 +141,16 @@ export default function GeneratePage() {
             return available[relaxedMarkIndex];
           }
 
-          // 4. Last Resort: Any available question not used
-          const lastResortIndex = available.findIndex(q => !currentUsedIds.includes(q.id));
+          // 4. Last Resort: Any available question not used, BUT respecting explicit opposite preference
+          // If we are looking for option1, don't steal option2-only questions.
+          const lastResortIndex = available.findIndex(q => {
+            if (currentUsedIds.includes(q.id)) return false;
+            // distinct types
+            if (preferredType === 'option1' && q.part_b_type === 'option2') return false;
+            if (preferredType === 'option2' && q.part_b_type === 'option1') return false;
+            return true;
+          });
+
           if (lastResortIndex !== -1) {
             return available[lastResortIndex];
           }
@@ -219,24 +229,24 @@ export default function GeneratePage() {
       // This guarantees no "lab()" colors or modern CSS crashes html2canvas.
 
       const getPageHTML = () => {
-        const borderStyle = 'border: 1px solid black; border-collapse: collapse;';
-        const cellStyle = 'border: 1px solid black; padding: 5px; text-align: left; vertical-align: top; font-size: 12px;';
+        const borderStyle = 'border: 1px solid #666; border-collapse: collapse; page-break-inside: auto;';
+        const cellStyle = 'border: 1px solid #666; padding: 5px; text-align: left; vertical-align: top; font-size: 12px;';
         const centerStyle = 'text-align: center;';
         const boldStyle = 'font-weight: bold;';
 
         // Helper to render sections
         const renderSections = () => generatedPaper.map(section => `
           <div style="margin-bottom: 20px;">
-            <div style="text-align: center; margin-bottom: 5px;">
-              <div style="font-weight: bold; font-size: 14px; border-top: 2px solid black; border-bottom: 2px solid black; display: inline-block; padding: 2px 10px;">
+            <div style="text-align: center; margin-bottom: 8px;">
+              <div style="font-weight: 900; font-size: 14px; text-transform: uppercase; border-top: 1px solid #666; border-bottom: 1px solid #666; padding: 4px 0; width: 100%;">
                 ${section.sectionName}
               </div>
-              <div style="font-size: 10px; font-style: italic; margin-top: 2px;">${section.instructions}</div>
+              <div style="font-size: 10px; font-style: italic; margin-top: 4px; font-weight: bold;">${section.instructions}</div>
             </div>
             
             <table style="width: 100%; ${borderStyle} font-size: 12px;">
               <thead>
-                <tr style="background-color: #f0f0f0;">
+                <tr style="background-color: #f0f0f0; page-break-inside: avoid;">
                   <th style="${cellStyle} width: 40px; text-align: center;">No</th>
                   <th style="${cellStyle} text-align: center;">Questions</th>
                   <th style="${cellStyle} width: 60px; text-align: center;">Marks</th>
@@ -245,7 +255,7 @@ export default function GeneratePage() {
               <tbody>
                 ${section.type === 'partA'
             ? section.questions.map((q, idx) => `
-                    <tr>
+                    <tr style="page-break-inside: avoid;">
                       <td style="${cellStyle} text-align: center;">${idx + 1}</td>
                       <td style="${cellStyle}">${q.question_text}</td>
                       <td style="${cellStyle} text-align: center; font-weight: bold;">${q.marks}</td>
@@ -253,7 +263,7 @@ export default function GeneratePage() {
                   `).join('')
             : section.modules.map((mod, mIdx) => `
                     <!-- Option 1 -->
-                    <tr>
+                    <tr style="page-break-inside: avoid;">
                       <td style="${cellStyle} text-align: center; font-weight: bold;">${String.fromCharCode(65 + (mIdx * 2))}</td>
                       <td style="${cellStyle}">
                         ${mod.option1.map((sq, sqIdx) => `
@@ -269,11 +279,11 @@ export default function GeneratePage() {
                       </td>
                     </tr>
                     <!-- OR -->
-                    <tr>
+                    <tr style="page-break-inside: avoid;">
                       <td colspan="3" style="${cellStyle} text-align: center; font-weight: bold; background-color: #f0f0f0;">OR</td>
                     </tr>
                     <!-- Option 2 -->
-                    <tr>
+                    <tr style="page-break-inside: avoid;">
                       <td style="${cellStyle} text-align: center; font-weight: bold;">${String.fromCharCode(66 + (mIdx * 2))}</td>
                       <td style="${cellStyle}">
                         ${mod.option2.map((sq, sqIdx) => `
@@ -310,10 +320,10 @@ export default function GeneratePage() {
                 <div style="font-size: 10px; font-weight: bold;">(AN AUTONOMOUS INSTITUTION)</div>
               </div>
               <div style="text-align: center; border-bottom: 1px solid #666; padding: 5px; font-weight: bold; font-size: 14px;">
-                BTech Degree S3 (Regular) Examination October 2025
+                ${examinationName}
               </div>
               <div style="text-align: center; border-bottom: 1px solid #666; padding: 5px; font-weight: bold; font-size: 14px;">
-                Course Code : 24CSMAT301/24AMMAT301
+                Course Code : ${courseCode}
               </div>
               <div style="text-align: center; border-bottom: 1px solid #666; padding: 5px; font-weight: bold; font-size: 14px; text-transform: uppercase;">
                 Course Name : ${selectedSubject || 'MATHEMATICS'}
@@ -379,6 +389,7 @@ export default function GeneratePage() {
           windowWidth: 794
         },
         jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
       // Capture the PAPER element, not the overlay container
@@ -447,6 +458,27 @@ export default function GeneratePage() {
                   ))}
                 </select>
 
+                <div className="flex flex-col gap-4 w-full sm:flex-1 max-w-none sm:max-w-sm">
+                  <input
+                    type="text"
+                    value={examinationName}
+                    onChange={(e) => setExaminationName(e.target.value)}
+                    placeholder="Examination (e.g. BTech S3 Exam)"
+                    className={`w-full px-6 py-4 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-bold transition-all duration-200 ${isDark
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
+                      : 'bg-[#f8fafc] border border-[#e2e8f0] text-[#1e293b] placeholder-[#94a3b8]'}`}
+                  />
+                  <input
+                    type="text"
+                    value={courseCode}
+                    onChange={(e) => setCourseCode(e.target.value)}
+                    placeholder="Course Code (e.g. 24CSMAT301)"
+                    className={`w-full px-6 py-4 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none font-bold transition-all duration-200 ${isDark
+                      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
+                      : 'bg-[#f8fafc] border border-[#e2e8f0] text-[#1e293b] placeholder-[#94a3b8]'}`}
+                  />
+                </div>
+
                 <button
                   onClick={handleGenerate}
                   disabled={generating || !selectedSubject}
@@ -485,6 +517,8 @@ export default function GeneratePage() {
               {/* Note: QuestionPaperTemplate is usually white for print preview, keeping it white */}
               <QuestionPaperTemplate
                 courseName={selectedSubject}
+                examination={examinationName}
+                courseCode={courseCode}
                 sections={generatedPaper}
                 totalPaperMarks={60}
               />
