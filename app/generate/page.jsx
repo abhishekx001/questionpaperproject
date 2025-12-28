@@ -57,32 +57,39 @@ export default function GeneratePage() {
     try {
       const sections = [];
 
-      // --- PART A: 8 questions of 3 marks each ---
-      const { data: partAData, error: partAError } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('subject', selectedSubject)
-        .eq('marks', 3);
+      // --- PART A: 8 questions of 3 marks each (2 from each of first 4 modules) ---
+      const partAQuestions = [];
+      const partAModuleNumbers = ['1', '2', '3', '4'];
 
-      if (partAError) throw partAError;
+      for (const modNum of partAModuleNumbers) {
+        const { data: modQuestions, error: modError } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('subject', selectedSubject)
+          .eq('marks', 3)
+          .in('unit', [modNum, `Module ${modNum}`]);
 
-      let partAQuestions = partAData || [];
-      if (partAQuestions.length < 8) {
-        setWarning('Note: Some slots filled with placeholders due to insufficient 3-mark questions in the repository.');
-        while (partAQuestions.length < 8) {
-          partAQuestions.push({
-            id: `placeholder-a-${partAQuestions.length}`,
-            question_text: `[Sample Short Answer] Please add more 3-mark questions for ${selectedSubject}.`,
+        if (modError) throw modError;
+
+        const shuffled = shuffleArray(modQuestions || []);
+        const selected = shuffled.slice(0, 2);
+
+        // Fill placeholders if insufficient questions
+        while (selected.length < 2) {
+          selected.push({
+            id: `placeholder-a-${modNum}-${selected.length}`,
+            question_text: `[Sample Module ${modNum}] Add more 3-mark questions for ${selectedSubject}.`,
             marks: 3
           });
         }
+        partAQuestions.push(...selected);
       }
 
       sections.push({
         sectionName: 'PART A',
         type: 'partA',
         instructions: 'Answer all questions. Each question carries 3 marks',
-        questions: shuffleArray(partAQuestions).slice(0, 8),
+        questions: partAQuestions, // No shuffling here to preserve Module 1->4 order
         totalMarks: 24
       });
 
@@ -170,20 +177,46 @@ export default function GeneratePage() {
         ];
 
         for (const slot of slots) {
-          let q = getQuestionForSlot(slot.marks, slot.pref, moduleUsedIds);
+          // STRICT LOGIC: Mark must match exactly. No swaps allowed.
 
-          if (!q) {
-            q = {
-              id: `placeholder-b-${modNum}-${selectedForModule.length}`,
-              question_text: `[Sample Module ${modNum}] Add more ${slot.marks}-mark questions for ${selectedSubject}.`,
-              marks: slot.marks
-            };
-          } else {
-            moduleUsedIds.push(q.id);
+          // 1. Find ideal candidate (Marks + Type + Unused)
+          let qIndex = available.findIndex(q =>
+            q.marks === slot.marks &&
+            q.part_b_type === slot.pref &&
+            !moduleUsedIds.includes(q.id)
+          );
+
+          // 2. If no ideal, find candidate with (Marks + Type="any" + Unused)
+          if (qIndex === -1) {
+            qIndex = available.findIndex(q =>
+              q.marks === slot.marks &&
+              (q.part_b_type === 'any' || !q.part_b_type) &&
+              !moduleUsedIds.includes(q.id)
+            );
           }
 
-          // Force the mark to match the slot requirement (in case we did a fallback swap)
-          selectedForModule.push({ ...q, marks: slot.marks });
+          // 3. If still no candidate, find candidate with (Marks + Any Type + Unused)
+          // We prioritize Marks over Type correctness here to ensure "5 and 4" structure
+          if (qIndex === -1) {
+            qIndex = available.findIndex(q =>
+              q.marks === slot.marks &&
+              !moduleUsedIds.includes(q.id)
+            );
+          }
+
+          let q;
+          if (qIndex !== -1) {
+            q = available[qIndex];
+            moduleUsedIds.push(q.id);
+            selectedForModule.push(q);
+          } else {
+            // Placeholder if absolutely no question of that mark exists
+            selectedForModule.push({
+              id: `placeholder-b-${modNum}-${selectedForModule.length}`,
+              question_text: `[Sample Module ${modNum}] Add more ${slot.marks}-mark questions (${slot.pref}) for ${selectedSubject}.`,
+              marks: slot.marks
+            });
+          }
         }
 
         modules.push({

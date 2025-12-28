@@ -4,10 +4,12 @@ import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/components/ThemeProvider';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isDark } = useTheme();
   const mode = searchParams.get('mode') || 'login'; // 'login' or 'signup'
   const isSignup = mode === 'signup';
 
@@ -60,14 +62,14 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8">
+    <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${isDark ? 'bg-slate-900' : 'bg-gradient-to-br from-blue-50 to-indigo-100'}`}>
+      <div className={`max-w-md w-full rounded-lg shadow-xl p-8 transition-colors duration-300 ${isDark ? 'bg-slate-800 text-white shadow-slate-900/50' : 'bg-white text-gray-900'}`}>
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
             {isSignup ? 'Create Account' : 'Sign In'}
           </h1>
-          <p className="text-gray-600">
+          <p className={isDark ? 'text-slate-400' : 'text-gray-600'}>
             {isSignup
               ? 'Create a new account to get started'
               : 'Sign in to your account to continue'}
@@ -76,12 +78,12 @@ function LoginForm() {
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className={`mb-4 p-3 border rounded ${isDark ? 'bg-rose-900/30 border-rose-800 text-rose-300' : 'bg-red-100 border-red-400 text-red-700'}`}>
             {error}
           </div>
         )}
         {message && (
-          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+          <div className={`mb-4 p-3 border rounded ${isDark ? 'bg-emerald-900/30 border-emerald-800 text-emerald-300' : 'bg-green-100 border-green-400 text-green-700'}`}>
             {message}
           </div>
         )}
@@ -89,7 +91,7 @@ function LoginForm() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className={`block text-sm font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
               Email Address
             </label>
             <input
@@ -98,13 +100,15 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors ${isDark
+                ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
+                : 'bg-white border-gray-300 text-gray-900'}`}
               placeholder="your.email@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className={`block text-sm font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
               Password
             </label>
             <input
@@ -114,7 +118,9 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors ${isDark
+                ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
+                : 'bg-white border-gray-300 text-gray-900'}`}
               placeholder="••••••••"
             />
           </div>
@@ -130,7 +136,7 @@ function LoginForm() {
 
         {/* Toggle between login/signup */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
             {isSignup ? 'Already have an account? ' : "Don't have an account? "}
             <Link
               href={isSignup ? '/login' : '/login?mode=signup'}
@@ -145,7 +151,7 @@ function LoginForm() {
         <div className="mt-4 text-center">
           <Link
             href="/"
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className={`text-sm hover:text-gray-700 ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-gray-500 hover:text-gray-700'}`}
           >
             ← Back to Home
           </Link>

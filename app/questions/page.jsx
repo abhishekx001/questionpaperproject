@@ -14,13 +14,52 @@ export default function QuestionsPage() {
   const [error, setError] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
   const [filterMarks, setFilterMarks] = useState('');
+  const [filterModule, setFilterModule] = useState('');
+  const [moduleOptions, setModuleOptions] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [marksOptions, setMarksOptions] = useState([]);
 
-  // Fetch questions from Supabase
+  // Fetch filter options only once on mount
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      // Fetch all questions to determine available filter options
+      const { data } = await supabase.from('questions').select('subject, marks, unit');
+      if (data) {
+        const uniqueSubjects = [...new Set(data.map(q => q.subject).filter(Boolean))].sort();
+        const uniqueMarks = [...new Set(data.map(q => q.marks).filter(Boolean))].sort((a, b) => a - b);
+        const uniqueModules = [...new Set(data.map(q => q.unit).filter(Boolean))].sort();
+
+        setSubjects(uniqueSubjects);
+        setMarksOptions(uniqueMarks);
+        setModuleOptions(uniqueModules);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
+
+
+  // Fetch filter options only once on mount
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      // Fetch all questions to determine available filter options
+      const { data } = await supabase.from('questions').select('subject, marks, unit');
+      if (data) {
+        const uniqueSubjects = [...new Set(data.map(q => q.subject).filter(Boolean))].sort();
+        const uniqueMarks = [...new Set(data.map(q => q.marks).filter(Boolean))].sort((a, b) => a - b);
+        const uniqueModules = [...new Set(data.map(q => q.unit).filter(Boolean))].sort();
+
+        setSubjects(uniqueSubjects);
+        setMarksOptions(uniqueMarks);
+        setModuleOptions(uniqueModules);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
+
+  // Fetch questions whenever filters change
   useEffect(() => {
     fetchQuestions();
-  }, []);
+  }, [filterSubject, filterMarks, filterModule]);
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -36,6 +75,9 @@ export default function QuestionsPage() {
       if (filterMarks) {
         query = query.eq('marks', parseInt(filterMarks));
       }
+      if (filterModule) {
+        query = query.eq('unit', filterModule);
+      }
 
       const { data, error: fetchError } = await query;
 
@@ -44,14 +86,6 @@ export default function QuestionsPage() {
       }
 
       setQuestions(data || []);
-
-      // Extract unique subjects and marks for filters
-      if (data) {
-        const uniqueSubjects = [...new Set(data.map(q => q.subject).filter(Boolean))].sort();
-        const uniqueMarks = [...new Set(data.map(q => q.marks).filter(Boolean))].sort((a, b) => a - b);
-        setSubjects(uniqueSubjects);
-        setMarksOptions(uniqueMarks);
-      }
     } catch (err) {
       setError(err.message || 'Failed to fetch questions');
     } finally {
@@ -161,6 +195,26 @@ export default function QuestionsPage() {
               </select>
             </div>
             <div className="space-y-2">
+              <label htmlFor="filterModule" className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
+                By Module
+              </label>
+              <select
+                id="filterModule"
+                value={filterModule}
+                onChange={(e) => setFilterModule(e.target.value)}
+                className={`w-full px-5 py-3.5 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all duration-200 ${isDark
+                  ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
+                  : 'bg-[#f8fafc] border-[#e2e8f0] text-[#1e293b]'}`}
+              >
+                <option value="">All Modules</option>
+                {moduleOptions.map((mod) => (
+                  <option key={mod} value={mod}>
+                    {mod}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
               <label htmlFor="filterMarks" className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-[#64748b]'}`}>
                 By Weightage
               </label>
@@ -185,6 +239,7 @@ export default function QuestionsPage() {
                 onClick={() => {
                   setFilterSubject('');
                   setFilterMarks('');
+                  setFilterModule('');
                 }}
                 className={`w-full px-5 py-3.5 rounded-2xl font-bold transition-all duration-200 ${isDark
                   ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -286,8 +341,8 @@ export default function QuestionsPage() {
                               )}
                               {question.part_b_type && question.part_b_type !== 'any' && (
                                 <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-tight border ${question.part_b_type === 'option1'
-                                    ? (isDark ? 'bg-emerald-900/30 text-emerald-300 border-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-100')
-                                    : (isDark ? 'bg-purple-900/30 text-purple-300 border-purple-800' : 'bg-purple-50 text-purple-700 border-purple-100')
+                                  ? (isDark ? 'bg-emerald-900/30 text-emerald-300 border-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-100')
+                                  : (isDark ? 'bg-purple-900/30 text-purple-300 border-purple-800' : 'bg-purple-50 text-purple-700 border-purple-100')
                                   }`}>
                                   {question.part_b_type === 'option1' ? 'Part B: Opt 1' : 'Part B: Opt 2'}
                                 </span>
@@ -297,17 +352,30 @@ export default function QuestionsPage() {
                               {question.question_text}
                             </p>
                           </div>
-                          <button
-                            onClick={() => handleDelete(question.id)}
-                            className={`inline-flex items-center px-4 py-2 text-sm font-bold border rounded-xl transition-all duration-200 shadow-sm ${isDark
-                              ? 'bg-slate-800 text-rose-400 border-rose-900/30 hover:bg-rose-900/20'
-                              : 'bg-white text-rose-600 border-rose-100 hover:bg-rose-600 hover:text-white'}`}
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Delete
-                          </button>
+                          <div className="flex gap-2 shrink-0">
+                            <button
+                              onClick={() => router.push(`/questions/edit/${question.id}`)}
+                              className={`inline-flex items-center px-4 py-2 text-sm font-bold border rounded-xl transition-all duration-200 shadow-sm ${isDark
+                                ? 'bg-slate-800 text-blue-400 border-blue-900/30 hover:bg-blue-900/20'
+                                : 'bg-white text-blue-600 border-blue-100 hover:bg-blue-50 hover:text-blue-700'}`}
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(question.id)}
+                              className={`inline-flex items-center px-4 py-2 text-sm font-bold border rounded-xl transition-all duration-200 shadow-sm ${isDark
+                                ? 'bg-slate-800 text-rose-400 border-rose-900/30 hover:bg-rose-900/20'
+                                : 'bg-white text-rose-600 border-rose-100 hover:bg-rose-600 hover:text-white'}`}
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
