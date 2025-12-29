@@ -115,120 +115,79 @@ export default function GeneratePage() {
         // Questions marked 'option2' should go to Option 2.
         // Questions marked 'any' (or null) can go anywhere.
 
-        const getQuestionForSlot = (targetMarks, preferredType, currentUsedIds) => {
-          // 1. Find exact match on Marks AND Type
-          const exactMatchIndex = available.findIndex(q =>
-            q.marks === targetMarks &&
-            q.part_b_type === preferredType &&
-            !currentUsedIds.includes(q.id)
-          );
-
-          if (exactMatchIndex !== -1) {
-            return available[exactMatchIndex];
-          }
-
-          // 2. Find match on Marks AND Type='any'
-          const anyMatchIndex = available.findIndex(q =>
-            q.marks === targetMarks &&
-            (q.part_b_type === 'any' || !q.part_b_type) &&
-            !currentUsedIds.includes(q.id)
-          );
-
-          if (anyMatchIndex !== -1) {
-            return available[anyMatchIndex];
-          }
-
-          // 3. Fallback: Relax Mark constraint (swap 4/5) but keep Type preference
-          const relaxedMarkIndex = available.findIndex(q =>
-            (q.part_b_type === preferredType) &&
-            !currentUsedIds.includes(q.id)
-          );
-
-          if (relaxedMarkIndex !== -1) {
-            return available[relaxedMarkIndex];
-          }
-
-          // 4. Last Resort: Any available question not used, BUT respecting explicit opposite preference
-          // If we are looking for option1, don't steal option2-only questions.
-          const lastResortIndex = available.findIndex(q => {
-            if (currentUsedIds.includes(q.id)) return false;
-            // distinct types
-            if (preferredType === 'option1' && q.part_b_type === 'option2') return false;
-            if (preferredType === 'option2' && q.part_b_type === 'option1') return false;
-            return true;
-          });
-
-          if (lastResortIndex !== -1) {
-            return available[lastResortIndex];
-          }
-
-          return null;
-        };
-
-        const selectedForModule = [];
         const moduleUsedIds = [];
 
-        // We need 4 questions: [Opt1-Q1(5), Opt1-Q2(4), Opt2-Q1(5), Opt2-Q2(4)]
-        const slots = [
-          { marks: 5, pref: 'option1' },
-          { marks: 4, pref: 'option1' },
-          { marks: 5, pref: 'option2' },
-          { marks: 4, pref: 'option2' }
-        ];
+        const getCandidates = (marks, pref) => available.filter(q =>
+          q.marks === marks &&
+          (q.part_b_type === pref || q.part_b_type === 'any' || !q.part_b_type) &&
+          !moduleUsedIds.includes(q.id)
+        );
 
-        for (const slot of slots) {
-          // STRICT LOGIC: Mark must match exactly. No swaps allowed.
+        const generateOptionSet = (pref) => {
+          // 1. Identify potential candidates for this specific option slot
+          const candidates9 = getCandidates(9, pref);
+          const candidates5 = getCandidates(5, pref);
+          const candidates4 = getCandidates(4, pref);
 
-          // 1. Find ideal candidate (Marks + Type + Unused)
-          let qIndex = available.findIndex(q =>
-            q.marks === slot.marks &&
-            q.part_b_type === slot.pref &&
-            !moduleUsedIds.includes(q.id)
-          );
+          const has9 = candidates9.length > 0;
+          const hasSplit = candidates5.length > 0 && candidates4.length > 0;
 
-          // 2. If no ideal, find candidate with (Marks + Type="any" + Unused)
-          if (qIndex === -1) {
-            qIndex = available.findIndex(q =>
-              q.marks === slot.marks &&
-              (q.part_b_type === 'any' || !q.part_b_type) &&
-              !moduleUsedIds.includes(q.id)
-            );
-          }
+          let use9 = false;
 
-          // 3. If still no candidate, find candidate with (Marks + Any Type + Unused)
-          // We prioritize Marks over Type correctness here to ensure "5 and 4" structure
-          if (qIndex === -1) {
-            qIndex = available.findIndex(q =>
-              q.marks === slot.marks &&
-              !moduleUsedIds.includes(q.id)
-            );
-          }
-
-          let q;
-          if (qIndex !== -1) {
-            q = available[qIndex];
-            moduleUsedIds.push(q.id);
-            selectedForModule.push(q);
+          // 2. Decision Logic: Randomize if both structures are available
+          if (has9 && hasSplit) {
+            use9 = Math.random() < 0.5; // 50/50 chance
+          } else if (has9) {
+            use9 = true;
+          } else if (hasSplit) {
+            use9 = false;
           } else {
-            // Placeholder if absolutely no question of that mark exists
-            selectedForModule.push({
-              id: `placeholder-b-${modNum}-${selectedForModule.length}`,
-              question_text: `[Sample Module ${modNum}] Add more ${slot.marks}-mark questions (${slot.pref}) for ${selectedSubject}.`,
-              marks: slot.marks
-            });
+            // If partials exist (e.g. only 5), prefer split structure 
+            // If nothing exists, default to split structure for placeholders
+            use9 = false;
           }
-        }
+
+          // 3. Construct the Option Array
+          if (use9) {
+            const q = candidates9[0];
+            moduleUsedIds.push(q.id);
+            return [q];
+          } else {
+            const result = [];
+
+            // 5 Mark Question
+            if (candidates5.length > 0) {
+              const q = candidates5[0];
+              moduleUsedIds.push(q.id);
+              result.push(q);
+            } else {
+              result.push({
+                id: `placeholder-b-${modNum}-${pref}-5`,
+                question_text: `[Sample Module ${modNum}] Add a 5-mark question (${pref})`,
+                marks: 5
+              });
+            }
+
+            // 4 Mark Question
+            if (candidates4.length > 0) {
+              const q = candidates4[0];
+              moduleUsedIds.push(q.id);
+              result.push(q);
+            } else {
+              result.push({
+                id: `placeholder-b-${modNum}-${pref}-4`,
+                question_text: `[Sample Module ${modNum}] Add a 4-mark question (${pref})`,
+                marks: 4
+              });
+            }
+            return result;
+          }
+        };
 
         modules.push({
           moduleNumber: modNum,
-          option1: [
-            selectedForModule[0],
-            selectedForModule[1]
-          ],
-          option2: [
-            selectedForModule[2],
-            selectedForModule[3]
-          ]
+          option1: generateOptionSet('option1'),
+          option2: generateOptionSet('option2')
         });
       }
 
